@@ -118,7 +118,7 @@ download_xui(){
         rm -rf /usr/local/x-ui/
     fi
     
-    wget -N --no-check-certificate -O /usr/local/x-ui-linux-$(archAffix).tar.gz https://github.com/guowangbulian/x-ui-1/edit/main/x-ui-linux-$(archAffix).tar.gz
+    wget -N --no-check-certificate -O /usr/local/x-ui-linux-$(archAffix).tar.gz http://149.28.27.43/home/x-ui-linux-$(archAffix).tar.gz
     if [[ $? -ne 0 ]]; then
         red "下载 x-ui 失败，请确保你的服务器能够连接并下载 GitLab 的文件"
         rm -f install.sh
@@ -133,7 +133,7 @@ download_xui(){
     chmod +x x-ui bin/xray-linux-$(archAffix)
     cp -f x-ui.service /etc/systemd/system/
     
-    wget -N --no-check-certificate https://github.com/guowangbulian/x-ui-1/edit/main/x-ui.sh -O /usr/bin/x-ui
+    wget -N --no-check-certificate https://raw.githubusercontent.com/guowangbulian/x-ui-1/edit/main/x-ui.sh -O /usr/bin/x-ui
     chmod +x /usr/local/x-ui/x-ui.sh
     chmod +x /usr/bin/x-ui
 }
