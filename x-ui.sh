@@ -88,7 +88,7 @@ before_show_menu() {
 }
 
 install() {
-    bash <(curl -Ls https://raw.githubusercontent.com/guowangbulian/x-ui-1/blob/main/install.sh)
+    bash <(curl -Ls https://raw.githubusercontent.com/guowangbulian/x-ui-1/main/install.sh)
     if [[ $? == 0 ]]; then
         if [[ $# == 0 ]]; then
             start
@@ -121,7 +121,7 @@ update() {
         chmod +x x-ui bin/xray-linux-$(archAffix)
         cp -f x-ui.service /etc/systemd/system/
         
-        wget -N --no-check-certificate https://raw.githubusercontent.com/guowangbulian/x-ui-1/blob/main/x-ui.sh -O /usr/bin/x-ui
+        wget -N --no-check-certificate https://raw.githubusercontent.com/guowangbulian/x-ui-1/main/x-ui.sh -O /usr/bin/x-ui
         chmod +x /usr/local/x-ui/x-ui.sh
         chmod +x /usr/bin/x-ui
         
@@ -316,7 +316,7 @@ install_bbr() {
 }
 
 update_shell() {
-    wget -O /usr/bin/x-ui -N --no-check-certificate https://raw.githubusercontent.com/guowangbulian/x-ui-1/blob/main/x-ui.sh
+    wget -O /usr/bin/x-ui -N --no-check-certificate https://raw.githubusercontent.com/guowangbulian/x-ui-1/main/x-ui.sh
     if [[ $? != 0 ]]; then
         echo ""
         red "下载脚本失败，请检查本机能否连接 GitLab"
