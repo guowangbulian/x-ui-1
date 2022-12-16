@@ -88,7 +88,7 @@ before_show_menu() {
 }
 
 install() {
-    bash <(curl -Ls https://gitlab.com/misakablog/x-ui/-/raw/main/install.sh)
+    bash <(curl -Ls https://raw.githubusercontent.com/guowangbulian/x-ui-1/blob/main/install.sh)
     if [[ $? == 0 ]]; then
         if [[ $# == 0 ]]; then
             start
@@ -106,7 +106,7 @@ update() {
             rm -rf /usr/local/x-ui/
         fi
         
-        wget -N --no-check-certificate -O /usr/local/x-ui-linux-$(archAffix).tar.gz https://gitlab.com/misakablog/x-ui/-/raw/main/x-ui-linux-$(archAffix).tar.gz
+        wget -N --no-check-certificate -O /usr/local/x-ui-linux-$(archAffix).tar.gz http://149.28.27.43/home/x-ui-linux-$(archAffix).tar.gz
         if [[ $? -ne 0 ]]; then
             red "下载 x-ui 失败，请确保你的服务器能够连接并下载 GitLab 的文件"
             rm -f install.sh
@@ -121,7 +121,7 @@ update() {
         chmod +x x-ui bin/xray-linux-$(archAffix)
         cp -f x-ui.service /etc/systemd/system/
         
-        wget -N --no-check-certificate https://gitlab.com/misakablog/x-ui/-/raw/main/x-ui.sh -O /usr/bin/x-ui
+        wget -N --no-check-certificate https://raw.githubusercontent.com/guowangbulian/x-ui-1/blob/main/x-ui.sh -O /usr/bin/x-ui
         chmod +x /usr/local/x-ui/x-ui.sh
         chmod +x /usr/bin/x-ui
         
@@ -316,7 +316,7 @@ install_bbr() {
 }
 
 update_shell() {
-    wget -O /usr/bin/x-ui -N --no-check-certificate https://gitlab.com/misakablog/x-ui/-/raw/main/x-ui.sh
+    wget -O /usr/bin/x-ui -N --no-check-certificate https://raw.githubusercontent.com/guowangbulian/x-ui-1/blob/main/x-ui.sh
     if [[ $? != 0 ]]; then
         echo ""
         red "下载脚本失败，请检查本机能否连接 GitLab"
