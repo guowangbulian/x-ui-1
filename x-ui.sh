@@ -1,86 +1,71 @@
 #!/bin/bash
 
-red='\033[0;31m'
-green='\033[0;32m'
-yellow='\033[0;33m'
-plain='\033[0m'
+export LANG=en_US.UTF-8
 
-#consts for log check and clear,unit:M
-declare -r DEFAULT_LOG_FILE_DELETE_TRIGGER=35
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[0;33m'
+PLAIN='\033[0m'
 
-# consts for geo update
-PATH_FOR_GEO_IP='/usr/local/x-ui/bin/geoip.dat'
-PATH_FOR_GEO_SITE='/usr/local/x-ui/bin/geosite.dat'
-URL_FOR_GEO_IP='https://github.com/Loyalsoldier/v2ray-rules-dat/releases/latest/download/geoip.dat'
-URL_FOR_GEO_SITE='https://github.com/Loyalsoldier/v2ray-rules-dat/releases/latest/download/geosite.dat'
-
-#Add some basic function here
-function LOGD() {
-    echo -e "${yellow}[DEG] $* ${plain}"
+red() {
+    echo -e "\033[31m\033[01m$1\033[0m"
 }
 
-function LOGE() {
-    echo -e "${red}[ERR] $* ${plain}"
+green() {
+    echo -e "\033[32m\033[01m$1\033[0m"
 }
 
-function LOGI() {
-    echo -e "${green}[INF] $* ${plain}"
+yellow() {
+    echo -e "\033[33m\033[01m$1\033[0m"
 }
-# check root
-[[ $EUID -ne 0 ]] && LOGE "错误:  必须使用root用户运行此脚本!\n" && exit 1
 
-# check os
-if [[ -f /etc/redhat-release ]]; then
-    release="centos"
-elif cat /etc/issue | grep -Eqi "debian"; then
-    release="debian"
-elif cat /etc/issue | grep -Eqi "ubuntu"; then
-    release="ubuntu"
-elif cat /etc/issue | grep -Eqi "centos|red hat|redhat"; then
-    release="centos"
-elif cat /proc/version | grep -Eqi "debian"; then
-    release="debian"
-elif cat /proc/version | grep -Eqi "ubuntu"; then
-    release="ubuntu"
-elif cat /proc/version | grep -Eqi "centos|red hat|redhat"; then
-    release="centos"
-else
-    LOGE "未检测到系统版本，请联系脚本作者！\n" && exit 1
-fi
+REGEX=("debian" "ubuntu" "centos|red hat|kernel|oracle linux|alma|rocky" "'amazon linux'" "fedora", "alpine")
+RELEASE=("Debian" "Ubuntu" "CentOS" "CentOS" "Fedora" "Alpine")
+PACKAGE_UPDATE=("apt-get update" "apt-get update" "yum -y update" "yum -y update" "yum -y update" "apk update -f")
+PACKAGE_INSTALL=("apt -y install" "apt -y install" "yum -y install" "yum -y install" "yum -y install" "apk add -f")
+PACKAGE_REMOVE=("apt -y remove" "apt -y remove" "yum -y remove" "yum -y remove" "yum -y remove" "apk del -f")
+PACKAGE_UNINSTALL=("apt -y autoremove" "apt -y autoremove" "yum -y autoremove" "yum -y autoremove" "yum -y autoremove" "apk del -f")
 
-os_version=""
+[[ $EUID -ne 0 ]] && red "请在root用户下运行脚本" && exit 1
 
-# os version
-if [[ -f /etc/os-release ]]; then
-    os_version=$(awk -F'[= ."]' '/VERSION_ID/{print $3}' /etc/os-release)
-fi
-if [[ -z "$os_version" && -f /etc/lsb-release ]]; then
-    os_version=$(awk -F'[= ."]+' '/DISTRIB_RELEASE/{print $2}' /etc/lsb-release)
-fi
+CMD=("$(grep -i pretty_name /etc/os-release 2>/dev/null | cut -d \" -f2)" "$(hostnamectl 2>/dev/null | grep -i system | cut -d : -f2)" "$(lsb_release -sd 2>/dev/null)" "$(grep -i description /etc/lsb-release 2>/dev/null | cut -d \" -f2)" "$(grep . /etc/redhat-release 2>/dev/null)" "$(grep . /etc/issue 2>/dev/null | cut -d \\ -f1 | sed '/^[ ]*$/d')")
 
-if [[ x"${release}" == x"centos" ]]; then
-    if [[ ${os_version} -le 6 ]]; then
-        LOGE "请使用 CentOS 7 或更高版本的系统！\n" && exit 1
-    fi
-elif [[ x"${release}" == x"ubuntu" ]]; then
-    if [[ ${os_version} -lt 16 ]]; then
-        LOGE "请使用 Ubuntu 16 或更高版本的系统！\n" && exit 1
-    fi
-elif [[ x"${release}" == x"debian" ]]; then
-    if [[ ${os_version} -lt 8 ]]; then
-        LOGE "请使用 Debian 8 或更高版本的系统！\n" && exit 1
-    fi
-fi
+for i in "${CMD[@]}"; do
+    SYS="$i" && [[ -n $SYS ]] && break
+done
+
+for ((int = 0; int < ${#REGEX[@]}; int++)); do
+    [[ $(echo "$SYS" | tr '[:upper:]' '[:lower:]') =~ ${REGEX[int]} ]] && SYSTEM="${RELEASE[int]}" && [[ -n $SYSTEM ]] && break
+done
+
+[[ -z $SYSTEM ]] && red "不支持当前VPS系统，请使用主流的操作系统" && exit 1
+
+os_version=$(grep -i version_id /etc/os-release | cut -d \" -f2 | cut -d . -f1)
+
+[[ $SYSTEM == "CentOS" && ${os_version} -lt 7 ]] && echo -e "请使用 CentOS 7 或更高版本的系统！" && exit 1
+[[ $SYSTEM == "Fedora" && ${os_version} -lt 29 ]] && echo -e "请使用 Fedora 29 或更高版本的系统！" && exit 1
+[[ $SYSTEM == "Ubuntu" && ${os_version} -lt 16 ]] && echo -e "请使用 Ubuntu 16 或更高版本的系统！" && exit 1
+[[ $SYSTEM == "Debian" && ${os_version} -lt 9 ]] && echo -e "请使用 Debian 9 或更高版本的系统！" && exit 1
+
+archAffix(){
+    case "$(uname -m)" in
+        x86_64 | x64 | amd64 ) echo 'amd64' ;;
+        armv8 | arm64 | aarch64 ) echo 'arm64' ;;
+        s390x ) echo 's390x' ;;
+        * ) red "不支持的CPU架构！" && exit 1 ;;
+    esac
+}
 
 confirm() {
     if [[ $# > 1 ]]; then
-        echo && read -p "$1 [默认$2]: " temp
+        echo && read -rp "$1 [默认$2]: " temp
         if [[ x"${temp}" == x"" ]]; then
             temp=$2
         fi
     else
-        read -p "$1 [y/n]: " temp
+        read -rp "$1 [y/n]: " temp
     fi
+    
     if [[ x"${temp}" == x"y" || x"${temp}" == x"Y" ]]; then
         return 0
     else
@@ -89,7 +74,7 @@ confirm() {
 }
 
 confirm_restart() {
-    confirm "是否重启面板，重启面板也会重启 xray" "y"
+    confirm "是否重启x-ui面板，重启面板也会重启xray" "y"
     if [[ $? == 0 ]]; then
         restart
     else
@@ -98,7 +83,7 @@ confirm_restart() {
 }
 
 before_show_menu() {
-    echo && echo -n -e "${yellow}按回车返回主菜单: ${plain}" && read temp
+    echo && echo -n -e "${YELLOW}按回车键返回主菜单: ${PLAIN}" && read temp
     show_menu
 }
 
@@ -114,23 +99,46 @@ install() {
 }
 
 update() {
-    confirm "本功能会强制重装当前最新版，数据不会丢失，是否继续?" "n"
-    if [[ $? != 0 ]]; then
-        LOGE "已取消"
-        if [[ $# == 0 ]]; then
-            before_show_menu
+    read -rp "本功能会更新x-ui面板至目前最新版本, 数据不会丢失, 是否继续? [Y/N]: " yn
+    if [[ $yn =~ "Y"|"y" ]]; then
+        systemctl stop x-ui
+        if [[ -e /usr/local/x-ui/ ]]; then
+            rm -rf /usr/local/x-ui/
         fi
-        return 0
-    fi
-    bash <(curl -Ls https://raw.githubusercontent.com/guowangbulian/x-ui-1/main/install.sh)
-    if [[ $? == 0 ]]; then
-        LOGI "更新完成，已自动重启面板 "
-        exit 0
+        
+        wget -N --no-check-certificate -O /usr/local/x-ui-linux-$(archAffix).tar.gz http://127.0.0.1/home/x-ui-linux-$(archAffix).tar.gz
+        if [[ $? -ne 0 ]]; then
+            red "下载 x-ui 失败，请确保你的服务器能够连接并下载 GitLab 的文件"
+            rm -f install.sh
+            exit 1
+        fi
+        
+        cd /usr/local/
+        tar zxvf x-ui-linux-$(archAffix).tar.gz
+        rm -f x-ui-linux-$(archAffix).tar.gz
+        
+        cd x-ui
+        chmod +x x-ui bin/xray-linux-$(archAffix)
+        cp -f x-ui.service /etc/systemd/system/
+        
+        wget -N --no-check-certificate https://raw.githubusercontent.com/guowangbulian/x-ui-1/main/x-ui.sh -O /usr/bin/x-ui
+        chmod +x /usr/local/x-ui/x-ui.sh
+        chmod +x /usr/bin/x-ui
+        
+        systemctl daemon-reload
+        systemctl enable x-ui >/dev/null 2>&1
+        systemctl start x-ui
+        
+        green "更新完成，已自动重启x-ui面板 "
+        exit 1
+    else
+        red "已取消升级x-ui面板"
+        exit 1
     fi
 }
 
 uninstall() {
-    confirm "确定要卸载面板吗,xray 也会卸载?" "n"
+    confirm "确定要卸载x-ui面板吗，xray 也会卸载?" "n"
     if [[ $? != 0 ]]; then
         if [[ $# == 0 ]]; then
             show_menu
@@ -144,59 +152,56 @@ uninstall() {
     systemctl reset-failed
     rm /etc/x-ui/ -rf
     rm /usr/local/x-ui/ -rf
-
-    echo ""
-    echo -e "卸载成功，如果你想删除此脚本，则退出脚本后运行 ${green}rm /usr/bin/x-ui -f${plain} 进行删除"
-    echo ""
-
-    if [[ $# == 0 ]]; then
-        before_show_menu
-    fi
+    rm /usr/bin/x-ui -f
+    green "x-ui面板已彻底卸载成功"
 }
 
 reset_user() {
-    confirm "确定要将用户名和密码重置为 admin 吗" "n"
+    confirm "确定要重置面板用户名和密码吗?" "n"
     if [[ $? != 0 ]]; then
         if [[ $# == 0 ]]; then
             show_menu
         fi
         return 0
     fi
-    /usr/local/x-ui/x-ui setting -username admin -password admin
-    echo -e "用户名和密码已重置为 ${green}admin${plain}，现在请重启面板"
+    read -rp "请设置登录用户名 [默认随机用户名]: " config_account
+    [[ -z $config_account ]] && config_account=$(date +%s%N | md5sum | cut -c 1-8)
+    read -rp "请设置登录密码 [默认随机密码]: " config_password
+    [[ -z $config_password ]] && config_password=$(date +%s%N | md5sum | cut -c 1-8)
+    /usr/local/x-ui/x-ui setting -username ${config_account} -password ${config_password} >/dev/null 2>&1
+    echo -e "面板登录用户名已重置为: ${GREEN} ${config_account} ${PLAIN}"
+    echo -e "面板登录密码已重置为: ${GREEN} ${config_password} ${PLAIN}"
+    green "请使用新的登录用户名、密码访问x-ui面板"
     confirm_restart
 }
 
 reset_config() {
-    confirm "确定要重置所有面板设置吗，账号数据不会丢失，用户名和密码不会改变" "n"
+    confirm "确定要重置所有设置吗，账号数据不会丢失，用户名和密码不会改变" "n"
     if [[ $? != 0 ]]; then
         if [[ $# == 0 ]]; then
             show_menu
         fi
         return 0
     fi
-    /usr/local/x-ui/x-ui setting -reset
-    echo -e "所有面板设置已重置为默认值，现在请重启面板，并使用默认的 ${green}54321${plain} 端口访问面板"
+    /usr/local/x-ui/x-ui setting -reset >/dev/null 2>&1
+    echo -e "所有面板设置已重置为默认值，请重启面板并使用默认的 ${GREEN}54321${PLAIN} 端口访问面板"
     confirm_restart
 }
 
-check_config() {
-    info=$(/usr/local/x-ui/x-ui setting -show true)
-    if [[ $? != 0 ]]; then
-        LOGE "get current settings error,please check logs"
-        show_menu
-    fi
-    LOGI "${info}"
-}
-
 set_port() {
-    echo && echo -n -e "输入端口号[1-65535]: " && read port
+    echo && echo -n -e "输入新的端口号[1-65535]: " && read port
     if [[ -z "${port}" ]]; then
-        LOGD "已取消"
+        red "已取消设置端口!"
         before_show_menu
     else
-        /usr/local/x-ui/x-ui setting -port ${port}
-        echo -e "设置端口完毕，现在请重启面板，并使用新设置的端口 ${green}${port}${plain} 访问面板"
+        until [[ -z $(ss -ntlp | awk '{print $4}' | grep -w "$port") ]]; do
+            if [[ -n $(ss -ntlp | awk '{print $4}' | grep -w "$port") ]]; then
+                yellow "你设置的访问端口目前已被占用，请重新设置端口"
+                echo -n -e "输入端口号[1-65535]: " && read port
+            fi
+        done
+        /usr/local/x-ui/x-ui setting -port ${port} >/dev/null 2>&1
+        echo -e "设置端口完毕，请重启面板并使用新设置的端口 ${GREEN}${port}${PLAIN} 访问面板"
         confirm_restart
     fi
 }
@@ -205,18 +210,18 @@ start() {
     check_status
     if [[ $? == 0 ]]; then
         echo ""
-        LOGI "面板已运行，无需再次启动，如需重启请选择重启"
+        green "x-ui面板已运行，无需再次启动，如需重启面板请使用重启选项"
     else
         systemctl start x-ui
         sleep 2
         check_status
         if [[ $? == 0 ]]; then
-            LOGI "x-ui 启动成功"
+            green "x-ui 面板启动成功"
         else
-            LOGE "面板启动失败，可能是因为启动时间超过了两秒，请稍后查看日志信息"
+            red "x-ui 面板启动失败，请稍后使用 x-ui log 查看日志信息"
         fi
     fi
-
+    
     if [[ $# == 0 ]]; then
         before_show_menu
     fi
@@ -226,18 +231,18 @@ stop() {
     check_status
     if [[ $? == 1 ]]; then
         echo ""
-        LOGI "面板已停止，无需再次停止"
+        green "x-ui 面板目前已停止，无需再次停止"
     else
         systemctl stop x-ui
         sleep 2
         check_status
         if [[ $? == 1 ]]; then
-            LOGI "x-ui 与 xray 停止成功"
+            green "x-ui 与 xray 停止成功"
         else
-            LOGE "面板停止失败，可能是因为停止时间超过了两秒，请稍后查看日志信息"
+            red "x-ui 面板停止失败，请稍后使用 x-ui log 查看日志信息"
         fi
     fi
-
+    
     if [[ $# == 0 ]]; then
         before_show_menu
     fi
@@ -248,9 +253,9 @@ restart() {
     sleep 2
     check_status
     if [[ $? == 0 ]]; then
-        LOGI "x-ui 与 xray 重启成功"
+        green "x-ui 与 xray 重启成功"
     else
-        LOGE "面板重启失败，可能是因为启动时间超过了两秒，请稍后查看日志信息"
+        red "x-ui 面板重启失败，请稍后使用 x-ui log 查看日志信息"
     fi
     if [[ $# == 0 ]]; then
         before_show_menu
@@ -264,27 +269,27 @@ status() {
     fi
 }
 
-enable() {
+enable_xui() {
     systemctl enable x-ui
     if [[ $? == 0 ]]; then
-        LOGI "x-ui 设置开机自启成功"
+        green "x-ui 设置开机自启成功"
     else
-        LOGE "x-ui 设置开机自启失败"
+        red "x-ui 设置开机自启失败"
     fi
-
+    
     if [[ $# == 0 ]]; then
         before_show_menu
     fi
 }
 
-disable() {
+disable_xui() {
     systemctl disable x-ui
     if [[ $? == 0 ]]; then
-        LOGI "x-ui 取消开机自启成功"
+        green "x-ui 取消开机自启成功"
     else
-        LOGE "x-ui 取消开机自启失败"
+        red "x-ui 取消开机自启失败"
     fi
-
+    
     if [[ $# == 0 ]]; then
         before_show_menu
     fi
@@ -299,7 +304,7 @@ show_log() {
 
 migrate_v2_ui() {
     /usr/local/x-ui/x-ui v2-ui
-
+    
     before_show_menu
 }
 
@@ -308,113 +313,6 @@ install_bbr() {
     bash <(curl -L -s https://raw.githubusercontent.com/teddysun/across/master/bbr.sh)
     echo ""
     before_show_menu
-}
-
-update_shell() {
-    wget -O /usr/bin/x-ui -N --no-check-certificate https://raw.githubusercontent.com/guowangbulian/x-ui-1/main/x-ui.sh
-    if [[ $? != 0 ]]; then
-        echo ""
-        LOGE "下载脚本失败，请检查本机能否连接 Github"
-        before_show_menu
-    else
-        chmod +x /usr/bin/x-ui
-        LOGI "升级脚本成功，请重新运行脚本" && exit 0
-    fi
-}
-
-# 0: running, 1: not running, 2: not installed
-check_status() {
-    if [[ ! -f /etc/systemd/system/x-ui.service ]]; then
-        return 2
-    fi
-    temp=$(systemctl status x-ui | grep Active | awk '{print $3}' | cut -d "(" -f2 | cut -d ")" -f1)
-    if [[ x"${temp}" == x"running" ]]; then
-        return 0
-    else
-        return 1
-    fi
-}
-
-check_enabled() {
-    temp=$(systemctl is-enabled x-ui)
-    if [[ x"${temp}" == x"enabled" ]]; then
-        return 0
-    else
-        return 1
-    fi
-}
-
-check_uninstall() {
-    check_status
-    if [[ $? != 2 ]]; then
-        echo ""
-        LOGE "面板已安装，请不要重复安装"
-        if [[ $# == 0 ]]; then
-            before_show_menu
-        fi
-        return 1
-    else
-        return 0
-    fi
-}
-
-check_install() {
-    check_status
-    if [[ $? == 2 ]]; then
-        echo ""
-        LOGE "请先安装面板"
-        if [[ $# == 0 ]]; then
-            before_show_menu
-        fi
-        return 1
-    else
-        return 0
-    fi
-}
-
-show_status() {
-    check_status
-    case $? in
-    0)
-        echo -e "面板状态: ${green}已运行${plain}"
-        show_enable_status
-        ;;
-    1)
-        echo -e "面板状态: ${yellow}未运行${plain}"
-        show_enable_status
-        ;;
-    2)
-        echo -e "面板状态: ${red}未安装${plain}"
-        ;;
-    esac
-    show_xray_status
-}
-
-show_enable_status() {
-    check_enabled
-    if [[ $? == 0 ]]; then
-        echo -e "是否开机自启: ${green}是${plain}"
-    else
-        echo -e "是否开机自启: ${red}否${plain}"
-    fi
-}
-
-check_xray_status() {
-    count=$(ps -ef | grep "xray-linux" | grep -v "grep" | wc -l)
-    if [[ count -ne 0 ]]; then
-        return 0
-    else
-        return 1
-    fi
-}
-
-show_xray_status() {
-    check_xray_status
-    if [[ $? == 0 ]]; then
-        echo -e "xray 状态: ${green}运行${plain}"
-    else
-        echo -e "xray 状态: ${red}未运行${plain}"
-    fi
 }
 
 #this will be an entrance for ssl cert issue
@@ -629,142 +527,160 @@ ssl_cert_issue_by_cloudflare() {
     fi
 }
 
-#add for cron jobs,including sync geo data,check logs and restart x-ui
-cron_jobs() {
-    clear
-    echo -e "
-  ${green}定时任务管理${plain}
-  ${green}0.${plain}  返回主菜单
-  ${green}1.${plain}  开启定时更新geo
-  ${green}2.${plain}  关闭定时更新geo
-  ${green}3.${plain}  开启定时删除xray日志
-  ${green}4.${plain}  关闭定时删除xray日志
-  "
-    echo && read -p "请输入选择 [0-4]: " num
-    case "${num}" in
-    0)
-        show_menu
+update_shell() {
+    wget -O /usr/bin/x-ui -N --no-check-certificate https://raw.githubusercontent.com/guowangbulian/x-ui-1/main/x-ui.sh
+    if [[ $? != 0 ]]; then
+        echo ""
+        red "下载脚本失败，请检查本机能否连接 GitLab"
+        before_show_menu
+    else
+        chmod +x /usr/bin/x-ui
+        green "升级脚本成功，请重新运行脚本" && exit 1
+    fi
+}
+
+# 0: running, 1: not running, 2: not installed
+check_status() {
+    if [[ ! -f /etc/systemd/system/x-ui.service ]]; then
+        return 2
+    fi
+    temp=$(systemctl status x-ui | grep Active | awk '{print $3}' | cut -d "(" -f2 | cut -d ")" -f1)
+    if [[ x"${temp}" == x"running" ]]; then
+        return 0
+    else
+        return 1
+    fi
+}
+
+check_enabled() {
+    temp=$(systemctl is-enabled x-ui)
+    if [[ x"${temp}" == x"enabled" ]]; then
+        return 0
+    else
+        return 1
+    fi
+}
+
+check_uninstall() {
+    check_status
+    if [[ $? != 2 ]]; then
+        echo ""
+        red "x-ui 面板已安装，请不要重复安装面板"
+        if [[ $# == 0 ]]; then
+            before_show_menu
+        fi
+        return 1
+    else
+        return 0
+    fi
+}
+
+check_install() {
+    check_status
+    if [[ $? == 2 ]]; then
+        echo ""
+        red "请先安装 X-ui 面板"
+        if [[ $# == 0 ]]; then
+            before_show_menu
+        fi
+        return 1
+    else
+        return 0
+    fi
+}
+
+show_status() {
+    check_status
+    case $? in
+        0)
+            echo -e "面板状态: ${GREEN}已运行${PLAIN}"
+            show_enable_status
         ;;
-    1)
-        enable_auto_update_geo
+        1)
+            echo -e "面板状态: ${YELLOW}未运行${PLAIN}"
+            show_enable_status
         ;;
-    2)
-        disable_auto_update_geo
-        ;;
-    3)
-        enable_auto_clear_log
-        ;;
-    4)
-        disable_auto_clear_log
-        ;;
-    *)
-        LOGE "请输入正确的数字 [0-4]"
+        2)
+            echo -e "面板状态: ${RED}未安装${PLAIN}"
         ;;
     esac
+    show_xray_status
 }
 
-#update geo data
-update_geo() {
-    #back up first
-    mv ${PATH_FOR_GEO_IP} ${PATH_FOR_GEO_IP}.bak
-    #update data
-    curl -s -L -o ${PATH_FOR_GEO_IP} ${URL_FOR_GEO_IP}
-    if [[ $? -ne 0 ]]; then
-        echo "update geoip.dat failed"
-        mv ${PATH_FOR_GEO_IP}.bak ${PATH_FOR_GEO_IP}
+show_enable_status() {
+    check_enabled
+    if [[ $? == 0 ]]; then
+        echo -e "是否开机自启: ${GREEN}是${PLAIN}"
     else
-        echo "update geoip.dat succeed"
-        rm -f ${PATH_FOR_GEO_IP}.bak
-    fi
-    mv ${PATH_FOR_GEO_SITE} ${PATH_FOR_GEO_SITE}.bak
-    curl -s -L -o ${PATH_FOR_GEO_SITE} ${URL_FOR_GEO_SITE}
-    if [[ $? -ne 0 ]]; then
-        echo "update geosite.dat failed"
-        mv ${PATH_FOR_GEO_SITE}.bak ${PATH_FOR_GEO_SITE}
-    else
-        echo "update geosite.dat succeed"
-        rm -f ${PATH_FOR_GEO_SITE}.bak
-    fi
-    #restart x-ui
-    systemctl restart x-ui
-}
-
-enable_auto_update_geo() {
-    LOGI "正在开启自动更新geo数据..."
-    crontab -l >/tmp/crontabTask.tmp
-    echo "00 4 */2 * * x-ui geo > /dev/null" >>/tmp/crontabTask.tmp
-    crontab /tmp/crontabTask.tmp
-    rm /tmp/crontabTask.tmp
-    LOGI "开启自动更新geo数据成功"
-}
-
-disable_auto_update_geo() {
-    crontab -l | grep -v "x-ui geo" | crontab -
-    if [[ $? -ne 0 ]]; then
-        LOGI "取消x-ui 自动更新geo数据失败"
-    else
-        LOGI "取消x-ui 自动更新geo数据成功"
+        echo -e "是否开机自启: ${RED}否${PLAIN}"
     fi
 }
 
-#clear xray log,need enable log in config template
-#here we need input an absolute path for log
-clear_log() {
-    LOGI "清除xray日志中..."
-    local filePath=''
-    if [[ $# -gt 0 ]]; then
-        filePath=$1
+check_xray_status() {
+    count=$(ps -ef | grep "xray-linux" | grep -v "grep" | wc -l)
+    if [[ count -ne 0 ]]; then
+        return 0
     else
-        LOGE "未输入有效文件路径,脚本退出"
-        exit 1
-    fi
-    LOGI "日志路径为:${filePath}"
-    if [[ ! -f ${filePath} ]]; then
-        LOGE "清除xray日志文件失败,${filePath}不存在,请确认"
-        exit 1
-    fi
-    fileSize=$(ls -la ${filePath} --block-size=M | awk '{print $5}' | awk -F 'M' '{print$1}')
-    if [[ ${fileSize} -gt ${DEFAULT_LOG_FILE_DELETE_TRIGGER} ]]; then
-        rm $1
-        if [[ $? -ne 0 ]]; then
-            LOGE "清除xray日志文件:${filePath}失败"
-        else
-            LOGI "清除xray日志文件:${filePath}成功"
-            systemctl restart x-ui
-        fi
-    else
-        LOGI "当前日志大小为${fileSize}M,小于${DEFAULT_LOG_FILE_DELETE_TRIGGER}M,将不会清除"
+        return 1
     fi
 }
 
-#enable auto delete log，need file path as
-enable_auto_clear_log() {
-    LOGI "设置定时清除xray日志..."
-    local filePath=''
-    read -p "请输入日志文件路径": filePath
-    if [[ ! -n ${filePath} ]]; then
-        LOGI "输入的日志文件路径无效,脚本退出"
-        exit 1
+show_xray_status() {
+    check_xray_status
+    if [[ $? == 0 ]]; then
+        echo -e "xray 状态: ${GREEN}运行中${PLAIN}"
+    else
+        echo -e "xray 状态: ${RED}未运行${PLAIN}"
     fi
-    if [[ ! -f ${filePath} ]]; then
-        LOGE "${filePath}不存在,设置定时清除xray日志失败"
-        exit 1
-    fi
-    crontab -l >/tmp/crontabTask.tmp
-    echo "30 4 */2 * * x-ui clear ${filePath} > /dev/null" >>/tmp/crontabTask.tmp
-    crontab /tmp/crontabTask.tmp
-    rm /tmp/crontabTask.tmp
-    LOGI "设置定时清除xray日志成功"
 }
 
-#disable auto dlete log
-disable_auto_clear_log() {
-    crontab -l | grep -v "x-ui clear" | crontab -
-    if [[ $? -ne 0 ]]; then
-        LOGI "取消 定时清除xray日志失败"
+open_ports(){
+    systemctl stop firewalld.service 2>/dev/null
+    systemctl disable firewalld.service 2>/dev/null
+    setenforce 0 2>/dev/null
+    ufw disable 2>/dev/null
+    iptables -P INPUT ACCEPT 2>/dev/null
+    iptables -P FORWARD ACCEPT 2>/dev/null
+    iptables -P OUTPUT ACCEPT 2>/dev/null
+    iptables -t nat -F 2>/dev/null
+    iptables -t mangle -F 2>/dev/null
+    iptables -F 2>/dev/null
+    iptables -X 2>/dev/null
+    netfilter-persistent save 2>/dev/null
+    green "VPS中的所有网络端口已开启"
+    before_show_menu
+}
+
+update_geo(){
+    systemctl stop x-ui
+    cd /usr/local/x-ui/bin
+    rm -f geoip.dat geosite.dat
+    wget -N https://github.com/Loyalsoldier/v2ray-rules-dat/releases/latest/download/geoip.dat
+    wget -N https://github.com/Loyalsoldier/v2ray-rules-dat/releases/latest/download/geosite.dat
+    systemctl start x-ui
+    green "Geosite 和 GeoIP 已更新成功！"
+    before_show_menu
+}
+
+checkv4v6(){
+    v6=$(curl -s6m8 api64.ipify.org -k)
+    v4=$(curl -s4m8 api64.ipify.org -k)
+}
+
+check_login_info(){
+    yellow "正在检查VPS系统及x-ui面板配置, 请稍等..."   
+    WgcfIPv4Status=$(curl -s4m8 https://www.cloudflare.com/cdn-cgi/trace -k | grep warp | cut -d= -f2)
+    WgcfIPv6Status=$(curl -s6m8 https://www.cloudflare.com/cdn-cgi/trace -k | grep warp | cut -d= -f2)
+    if [[ $WgcfIPv4Status =~ "on"|"plus" ]] || [[ $WgcfIPv6Status =~ "on"|"plus" ]]; then
+        wg-quick down wgcf >/dev/null 2>&1
+        systemctl stop warp-go >/dev/null 2>&1
+        checkv4v6
+        wg-quick up wgcf >/dev/null 2>&1
+        systemctl start warp-go >/dev/null 2>&1
     else
-        LOGI "取消 定时清除xray日志成功"
-    fi
+        checkv4v6
+    fi    
+    config_port=$(/usr/local/x-ui/x-ui 2>&1 | grep tcp | awk '{print $5}' | sed "s/://g")
 }
 
 show_usage() {
@@ -782,149 +698,88 @@ show_usage() {
     echo "x-ui update       - 更新 x-ui 面板"
     echo "x-ui install      - 安装 x-ui 面板"
     echo "x-ui uninstall    - 卸载 x-ui 面板"
-    echo "x-ui clear        - 清除 x-ui 日志"
-    echo "x-ui geo          - 更新 x-ui geo数据"
-    echo "x-ui cron         - 配置 x-ui 定时任务"
     echo "------------------------------------------"
 }
 
 show_menu() {
     echo -e "
-  ${green}x-ui 面板管理脚本${plain}
-  ${green}0.${plain} 退出脚本
+  ${GREEN}x-ui 面板管理脚本${PLAIN}
+  ${GREEN}0.${PLAIN} 退出脚本
 ————————————————
-  ${green}1.${plain} 安装 x-ui
-  ${green}2.${plain} 更新 x-ui
-  ${green}3.${plain} 卸载 x-ui
+  ${GREEN}1.${PLAIN} 安装 x-ui
+  ${GREEN}2.${PLAIN} 更新 x-ui
+  ${GREEN}3.${PLAIN} 卸载 x-ui
 ————————————————
-  ${green}4.${plain} 重置用户名密码
-  ${green}5.${plain} 重置面板设置
-  ${green}6.${plain} 设置面板端口
-  ${green}7.${plain} 查看当前面板信息
+  ${GREEN}4.${PLAIN} 重置用户名密码
+  ${GREEN}5.${PLAIN} 重置面板设置
+  ${GREEN}6.${PLAIN} 设置面板端口
 ————————————————
-  ${green}8.${plain} 启动 x-ui
-  ${green}9.${plain} 停止 x-ui
-  ${green}10.${plain} 重启 x-ui
-  ${green}11.${plain} 查看 x-ui 状态
-  ${green}12.${plain} 查看 x-ui 日志
+  ${GREEN}7.${PLAIN} 启动 x-ui
+  ${GREEN}8.${PLAIN} 停止 x-ui
+  ${GREEN}9.${PLAIN} 重启 x-ui
+ ${GREEN}10.${PLAIN} 查看 x-ui 状态
+ ${GREEN}11.${PLAIN} 查看 x-ui 日志
 ————————————————
-  ${green}13.${plain} 设置 x-ui 开机自启
-  ${green}14.${plain} 取消 x-ui 开机自启
+ ${GREEN}12.${PLAIN} 设置 x-ui 开机自启
+ ${GREEN}13.${PLAIN} 取消 x-ui 开机自启
 ————————————————
-  ${green}15.${plain} 一键安装 bbr (最新内核)
-  ${green}16.${plain} 一键申请SSL证书(acme申请)
-  ${green}17.${plain} 配置x-ui定时任务
- "
+ ${GREEN}14.${PLAIN} 更新 Geosite 和 GeoIP
+ ${GREEN}15.${PLAIN} 一键安装 bbr (最新内核)
+ ${GREEN}16.${PLAIN} 一键申请(acme脚本申请)
+ ${GREEN}17.${PLAIN} VPS防火墙放开所有网络端口
+ ${GREEN}18.${PLAIN} 安装并配置CloudFlare WARP
+    "
     show_status
-    echo && read -p "请输入选择 [0-16]: " num
-
+    echo ""
+    if [[ -n $v4 && -z $v6 ]]; then
+        echo -e "面板IPv4登录地址为: ${GREEN}http://$v4:$config_port ${PLAIN}"
+    elif [[ -n $v6 && -z $v4 ]]; then
+        echo -e "面板IPv6登录地址为: ${GREEN}http://[$v6]:$config_port ${PLAIN}"
+    elif [[ -n $v4 && -n $v6 ]]; then
+        echo -e "面板IPv4登录地址为: ${GREEN}http://$v4:$config_port ${PLAIN}"
+        echo -e "面板IPv6登录地址为: ${GREEN}http://[$v6]:$config_port ${PLAIN}"
+    fi
+    echo && read -rp "请输入选项 [0-18]: " num
+    
     case "${num}" in
-    0)
-        exit 0
-        ;;
-    1)
-        check_uninstall && install
-        ;;
-    2)
-        check_install && update
-        ;;
-    3)
-        check_install && uninstall
-        ;;
-    4)
-        check_install && reset_user
-        ;;
-    5)
-        check_install && reset_config
-        ;;
-    6)
-        check_install && set_port
-        ;;
-    7)
-        check_install && check_config
-        ;;
-    8)
-        check_install && start
-        ;;
-    9)
-        check_install && stop
-        ;;
-    10)
-        check_install && restart
-        ;;
-    11)
-        check_install && status
-        ;;
-    12)
-        check_install && show_log
-        ;;
-    13)
-        check_install && enable
-        ;;
-    14)
-        check_install && disable
-        ;;
-    15)
-        install_bbr
-        ;;
-    16)
-        ssl_cert_issue
-        ;;
-    17)
-        check_install && cron_jobs
-        ;;
-    *)
-        LOGE "请输入正确的数字 [0-16]"
-        ;;
+        0) exit 1 ;;
+        1) check_uninstall && install ;;
+        2) check_install && update ;;
+        3) check_install && uninstall ;;
+        4) check_install && reset_user ;;
+        5) check_install && reset_config ;;
+        6) check_install && set_port ;;
+        7) check_install && start ;;
+        8) check_install && stop ;;
+        9) check_install && restart ;;
+        10) check_install && status ;;
+        11) check_install && show_log ;;
+        12) check_install && enable_xui ;;
+        13) check_install && disable_xui ;;
+        14) update_geo ;;
+        15) install_bbr ;;
+        16) ssl_cert_issue ;;
+        17) open_ports ;;
+        18) wget -N --no-check-certificate https://gitlab.com/misakablog/warp-script/-/raw/main/warp.sh && bash warp.sh && before_show_menu ;;
+        *) red "请输入正确的选项 [0-18]" ;;
     esac
 }
 
 if [[ $# > 0 ]]; then
     case $1 in
-    "start")
-        check_install 0 && start 0
-        ;;
-    "stop")
-        check_install 0 && stop 0
-        ;;
-    "restart")
-        check_install 0 && restart 0
-        ;;
-    "status")
-        check_install 0 && status 0
-        ;;
-    "enable")
-        check_install 0 && enable 0
-        ;;
-    "disable")
-        check_install 0 && disable 0
-        ;;
-    "log")
-        check_install 0 && show_log 0
-        ;;
-    "v2-ui")
-        check_install 0 && migrate_v2_ui 0
-        ;;
-    "update")
-        check_install 0 && update 0
-        ;;
-    "install")
-        check_uninstall 0 && install 0
-        ;;
-    "uninstall")
-        check_install 0 && uninstall 0
-        ;;
-    "geo")
-        check_install 0 && update_geo
-        ;;
-    "clear")
-        check_install 0 && clear_log $2
-        ;;
-    "cron")
-        check_install && cron_jobs
-        ;;
-    *) show_usage ;;
+        "start") check_install 0 && start 0 ;;
+        "stop") check_install 0 && stop 0 ;;
+        "restart") check_install 0 && restart 0 ;;
+        "status") check_install 0 && status 0 ;;
+        "enable") check_install 0 && enable_xui 0 ;;
+        "disable") check_install 0 && disable_xui 0 ;;
+        "log") check_install 0 && show_log 0 ;;
+        "v2-ui") check_install 0 && migrate_v2_ui 0 ;;
+        "update") check_install 0 && update ;;
+        "install") check_uninstall 0 && install 0 ;;
+        "uninstall") check_install 0 && uninstall 0 ;;
+        *) show_usage ;;
     esac
 else
-    show_menu
+    check_login_info && show_menu
 fi
