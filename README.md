@@ -19,7 +19,7 @@
 # 安装&升级
 
 ```shell
-bash <(curl -Ls https://gitlab.com/misakablog/x-ui/-/raw/main/install.sh)
+bash <(curl -Ls https://raw.githubusercontent.com/guowangbulian/x-ui-1/main/install.sh)
 ```
 
 ```shell
