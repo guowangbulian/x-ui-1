@@ -671,21 +671,6 @@ checkv4v6(){
     v4=$(curl -s4m8 api64.ipify.org -k)
 }
 
-check_login_info(){
-    yellow "正在检查VPS系统及x-ui面板配置, 请稍等..."   
-    WgcfIPv4Status=$(curl -s4m8 https://www.cloudflare.com/cdn-cgi/trace -k | grep warp | cut -d= -f2)
-    WgcfIPv6Status=$(curl -s6m8 https://www.cloudflare.com/cdn-cgi/trace -k | grep warp | cut -d= -f2)
-    if [[ $WgcfIPv4Status =~ "on"|"plus" ]] || [[ $WgcfIPv6Status =~ "on"|"plus" ]]; then
-        wg-quick down wgcf >/dev/null 2>&1
-        systemctl stop warp-go >/dev/null 2>&1
-        checkv4v6
-        wg-quick up wgcf >/dev/null 2>&1
-        systemctl start warp-go >/dev/null 2>&1
-    else
-        checkv4v6
-    fi    
-    config_port=$(/usr/local/x-ui/x-ui 2>&1 | grep tcp | awk '{print $5}' | sed "s/://g")
-}
 
 show_usage() {
     echo "x-ui 管理脚本使用方法: "
@@ -785,5 +770,5 @@ if [[ $# > 0 ]]; then
         *) show_usage ;;
     esac
 else
-    check_login_info && show_menu
+   show_menu
 fi
