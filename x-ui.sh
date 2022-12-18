@@ -317,16 +317,16 @@ install_bbr() {
 
 #this will be an entrance for ssl cert issue
 #here we can provide two different methods to issue cert
-#first.standalone mode second.DNS API mode
+#first.standalone mode second.DNS API 
 ssl_cert_issue() {
     local method=""
-    echo -E ""
-    LOGD "******使用说明******"
-    LOGI "该脚本提供两种方式实现证书签发,证书安装路径均为/root/cert"
-    LOGI "方式1:acme standalone mode,需要保持端口开放"
-    LOGI "方式2:acme DNS API mode,需要提供Cloudflare Global API Key"
-    LOGI "如域名属于免费域名,则推荐使用方式1进行申请"
-    LOGI "如域名非免费域名且使用Cloudflare进行解析使用方式2进行申请"
+    echo -e ""
+    echo -e "******使用说明******"
+    echo -e "该脚本提供两种方式实现证书签发,证书安装路径均为/root/cert"
+    echo -e "方式1:acme standalone mode,需要保持端口开放"
+    echo -e "方式2:acme DNS API mode,需要提供Cloudflare Global API Key"
+    echo -e "如域名属于免费域名,则推荐使用方式1进行申请"
+    echo -e "如域名非免费域名且使用Cloudflare进行解析使用方式2进行申请"
     read -p "请选择你想使用的方式,输入数字1或者2后回车": method
     LOGI "你所使用的方式为${method}"
 
@@ -356,6 +356,10 @@ install_acme() {
 #method for standalone mode
 ssl_cert_issue_standalone() {
     #check for acme.sh first
+	local installSSLIPv6=
+	if echo "${localIP}" | grep -q ":"; then
+		installSSLIPv6="--listen-v6"
+	fi
     if ! command -v ~/.acme.sh/acme.sh &>/dev/null; then
         install_acme
         if [ $? -ne 0 ]; then
@@ -407,7 +411,7 @@ ssl_cert_issue_standalone() {
     #NOTE:This should be handled by user
     #open the port and kill the occupied progress
     ~/.acme.sh/acme.sh --set-default-ca --server letsencrypt
-    ~/.acme.sh/acme.sh --issue -d ${domain} --standalone --httpport ${WebPort}
+    ~/.acme.sh/acme.sh --issue -d ${domain} --standalone  --httpport ${WebPort} -k ec-256 --server letsencrypt ${installSSLIPv6}
     if [ $? -ne 0 ]; then
         LOGE "证书申请失败,原因请参见报错信息"
         rm -rf ~/.acme.sh/${domain}
@@ -760,7 +764,7 @@ show_menu() {
         15) install_bbr ;;
         16) ssl_cert_issue ;;
         17) open_ports ;;
-        18) wget -N --no-check-certificate https://gitlab.com/misakablog/warp-script/-/raw/main/warp.sh && bash warp.sh && before_show_menu ;;
+        18) wget -N --no-check-certificate https://raw.githubusercontent.com/guowangbulian/warp-script/main/warp.sh && bash warp.sh && before_show_menu ;;
         *) red "请输入正确的选项 [0-18]" ;;
     esac
 }
