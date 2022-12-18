@@ -60,15 +60,6 @@ archAffix(){
 info_bar(){
     clear
     echo "#############################################################"
-    echo -e "#                         ${RED}x-ui 面板${PLAIN}                         #"
-    echo -e "# ${GREEN}作者${PLAIN}: MisakaNo の 小破站                                  #"
-    echo -e "# ${GREEN}博客${PLAIN}: https://blog.misaka.rest                            #"
-    echo -e "# ${GREEN}GitHub 项目${PLAIN}: https://github.com/blog-misaka               #"
-    echo -e "# ${GREEN}GitLab 项目${PLAIN}: https://gitlab.com/misakablog                #"
-    echo -e "# ${GREEN}Telegram 频道${PLAIN}: https://t.me/misakablogchannel             #"
-    echo -e "# ${GREEN}Telegram 群组${PLAIN}: https://t.me/+CLhpemKhaC8wZGIx             #"
-    echo -e "# ${GREEN}YouTube 频道${PLAIN}: https://www.youtube.com/@misaka-blog        #"
-    echo "#############################################################"
     echo ""
     echo -e "操作系统: ${GREEN} ${CMD} ${PLAIN}"
     echo ""
@@ -80,25 +71,7 @@ checkv4v6(){
     v4=$(curl -s4m8 api64.ipify.org -k)
 }
 
-check_status(){
-    yellow "正在检查VPS的IP配置环境, 请稍等..." && sleep 1
-    WgcfIPv4Status=$(curl -s4m8 https://www.cloudflare.com/cdn-cgi/trace -k | grep warp | cut -d= -f2)
-    WgcfIPv6Status=$(curl -s6m8 https://www.cloudflare.com/cdn-cgi/trace -k | grep warp | cut -d= -f2)
-    if [[ $WgcfIPv4Status =~ "on"|"plus" ]] || [[ $WgcfIPv6Status =~ "on"|"plus" ]]; then
-        wg-quick down wgcf >/dev/null 2>&1
-        systemctl stop warp-go >/dev/null 2>&1
-        checkv4v6
-        wg-quick up wgcf >/dev/null 2>&1
-        systemctl start warp-go >/dev/null 2>&1
-    else
-        checkv4v6
-        if [[ -z $v4 && -n $v6 ]]; then
-            yellow "检测到为纯IPv6 VPS, 已自动添加DNS64解析服务器"
-            echo -e "nameserver 2a01:4f8:c2c:123f::1" > /etc/resolv.conf
-        fi
-    fi
-    sleep 1
-}
+
 
 install_base(){
     if [[ ! $SYSTEM == "CentOS" ]]; then
@@ -109,8 +82,7 @@ install_base(){
     fi
     if [[ -z $(type -P tar) ]]; then
         ${PACKAGE_INSTALL[int]} tar
-    fi   
-    check_status
+    
 }
 
 download_xui(){
