@@ -81,8 +81,7 @@ install_base(){
     fi
     if [[ -z $(type -P tar) ]]; then
         ${PACKAGE_INSTALL[int]} tar
-    fi   
-    check_status
+    fi
 }
 
 download_xui(){
