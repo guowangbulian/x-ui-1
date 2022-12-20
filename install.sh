@@ -60,6 +60,7 @@ archAffix(){
 info_bar(){
     clear
     echo "#############################################################"
+    echo "#############################################################"
     echo ""
     echo -e "操作系统: ${GREEN} ${CMD} ${PLAIN}"
     echo ""
@@ -69,6 +70,19 @@ info_bar(){
 checkv4v6(){
     v6=$(curl -s6m8 api64.ipify.org -k)
     v4=$(curl -s4m8 api64.ipify.org -k)
+}
+
+install_base(){
+    if [[ ! $SYSTEM == "CentOS" ]]; then
+        ${PACKAGE_UPDATE[int]}
+    fi
+    if [[ -z $(type -P curl) ]]; then
+        ${PACKAGE_INSTALL[int]} curl
+    fi
+    if [[ -z $(type -P tar) ]]; then
+        ${PACKAGE_INSTALL[int]} tar
+    fi   
+    check_status
 }
 
 download_xui(){
