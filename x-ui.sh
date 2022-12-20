@@ -554,5 +554,5 @@ if [[ $# > 0 ]]; then
         *) show_usage ;;
     esac
 else
-    check_login_info && show_menu
+        show_menu
 fi
