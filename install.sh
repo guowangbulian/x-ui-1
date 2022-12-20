@@ -162,7 +162,6 @@ install_xui() {
     echo -e "x-ui uninstall    - 卸载 x-ui 面板"
     echo -e "----------------------------------------------"
     echo -e ""
-    show_login_info
     echo -e ""
 }
 
